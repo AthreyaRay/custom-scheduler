@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+set -x
 
 # Get the list of changed files in the last commit
 CHANGED_FILES=$(git diff --name-only HEAD~1)
