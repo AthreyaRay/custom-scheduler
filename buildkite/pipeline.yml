@@ -1,0 +1,3 @@
+steps:
+- label: ":hammer: Setup"
+  command: "scripts/generate_pipeline.sh"
