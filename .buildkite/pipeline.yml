@@ -1,4 +1,4 @@
 steps:
-- label: ":hammer: Setup - Generate Pipeline"
+- label: ":hammer: Setup - Generate Pipeline 1"
   key: setup
   command: "python3 scripts/generate_pipeline.py"
