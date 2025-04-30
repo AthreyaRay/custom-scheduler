@@ -1,69 +1,46 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
-set -x
 
-# Get the list of changed files in the last commit
 CHANGED_FILES=$(git diff --name-only HEAD~1)
-
-# Define jobs as associative arrays
-declare -A JOB1=(
-  [name]="test-core"
-  [paths]="core/"
-  [command]="./scripts/test-core.sh"
-  [cpu]=4
-  [memory]="8G"
-  [queue]="production-large"
-)
-
-declare -A JOB2=(
-  [name]="lint-docs"
-  [paths]="docs/"
-  [command]="./scripts/lint-docs.sh"
-  [cpu]=1
-  [memory]="1G"
-  [queue]="production-small"
-)
-
-declare -A JOB3=(
-  [name]="build-api"
-  [paths]="api/"
-  [command]="./scripts/build-api.sh"
-  [cpu]=2
-  [memory]="4G"
-  [queue]="production-medium"
-)
-
-ALL_JOBS=(JOB1 JOB2 JOB3)
-
-# Begin YAML
 PIPELINE_FILE="pipeline.generated.yml"
 echo "steps:" > "$PIPELINE_FILE"
 
-# Loop through jobs and add matching ones to pipeline
-for JOB_VAR in "${ALL_JOBS[@]}"; do
-  eval "declare -A JOB=\"\${$JOB_VAR[@]}\""
-  
-  MATCHED=false
-  for FILE in $CHANGED_FILES; do
-    if [[ "$FILE" == ${!JOB[prefix]*} || "$FILE" == ${JOB[paths]}* ]]; then
-      MATCHED=true
-      break
-    fi
-  done
+# Helper function to add a job
+add_job() {
+  local label=$1
+  local command=$2
+  local queue=$3
+  local cpu=$4
+  local memory=$5
+  local job_size=${queue#production-}
 
-  if $MATCHED; then
-    cat <<EOF >> "$PIPELINE_FILE"
-  - label: ":rocket: ${JOB[name]}"
-    command: "${JOB[command]}"
+  cat <<EOF >> "$PIPELINE_FILE"
+  - label: ":rocket: $label"
+    command: "$command"
     agents:
-      queue: "${JOB[queue]}"
+      queue: "$queue"
     env:
-      CPU: "${JOB[cpu]}"
-      MEMORY: "${JOB[memory]}"
-      JOB_SIZE: "${JOB[queue]#production-}"
+      CPU: "$cpu"
+      MEMORY: "$memory"
+      JOB_SIZE: "$job_size"
+
 EOF
-  fi
+}
+
+# Logic for matching files and adding jobs
+for file in $CHANGED_FILES; do
+  case "$file" in
+    core/*)
+      add_job "test-core" "./scripts/test-core.sh" "production-large" 4 "8G"
+      ;;
+    docs/*)
+      add_job "lint-docs" "./scripts/lint-docs.sh" "production-small" 1 "1G"
+      ;;
+    api/*)
+      add_job "build-api" "./scripts/build-api.sh" "production-medium" 2 "4G"
+      ;;
+  esac
 done
 
-# Upload the generated pipeline
+# Upload pipeline
 buildkite-agent pipeline upload "$PIPELINE_FILE"
